@@ -57,20 +57,25 @@ The system uses a Master-Slave architecture where one Raspberry Pi acts as the "
 The setup process is fully automated by a single script.
 
 1. **Configure Fixed IPs:** Before running the script, ensure every Pi has its unique, fixed IP address configured and is connected to the network.
-2. **Run the Setup Script:** Copy the `setup_video_sync.sh` script to each Pi and run it with `sudo`:
+2. **Download the Setup Script:** On each Pi, run:
 
+   ```bash
+   wget https://raw.githubusercontent.com/jonaspoeller/synchronized4kplaybackrpi4/main/setup_video_sync.sh
+   ```
+
+3. **Run the Setup Script:**  
    ```bash
    sudo bash setup_video_sync.sh
    ```
 
-3. **Follow the Prompts:** The script will ask you for:
+4. **Follow the Prompts:** The script will ask you for:
    - The IP address of the current device.
    - The role of the device (Master or Slave).
    - The IP address of the Master (if configuring a Slave).
-4. **Automatic Reboot:** The script will automatically reboot the Pi after the installation is complete.
+
+5. **Automatic Reboot:** The script will automatically reboot the Pi after the installation is complete.
 
 After the reboot, the system is fully operational and will start automatically.
-
 ---
 
 ## Configuration
