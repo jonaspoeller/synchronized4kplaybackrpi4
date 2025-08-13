@@ -19,6 +19,7 @@ This project is the result of an intensive, iterative development and debugging 
 - **Fully Automated Setup:** A single, intelligent script handles system updates, dependency installation, boot configuration, and service creation from a fresh Raspberry Pi OS install.
 - **Fine-Grained Tuning:** Each device (including the master) has its own local start delay parameter, allowing for precise compensation for different display latencies (e.g., slow TVs vs. fast monitors).
 - **Optimized for Raspberry Pi 4:** Utilizes the 64-bit OS, hardware-accelerated HEVC decoding (`v4l2m2m`), and direct-to-display video rendering (`drm_vout`) for maximum performance.
+- **Proven Performance:** Tested up to **4K@60 fps, 8-bit, 50 Mbit/s** MP4 video files.
 
 ---
 
