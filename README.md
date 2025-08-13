@@ -13,7 +13,6 @@ This project is the result of an intensive, iterative development and debugging 
 - **Rock-Solid Reliability:** The system is designed to be "unbreakable".
   - **Authoritative Master:** The Master node dictates the entire state, ensuring no ambiguity.
   - **Proactive Slaves:** Slaves boot into a prepared, "warm" standby state, ensuring they are instantly ready for a start command, even when joining a running system.
-  - **Self-Healing Slaves:** A watchdog on each slave detects a master signal loss. After 5 seconds, it automatically reverts to a safe, black-screen standby mode, ready for a clean start when the master reappears.
 - **Completely Headless Operation:**
   - **Silent Boot:** All Raspberry Pi boot text, logos, and cursors are suppressed for a professional, appliance-like startup.
   - **Console Disabled:** The login prompt on the attached display is permanently disabled, preventing any on-screen text.
