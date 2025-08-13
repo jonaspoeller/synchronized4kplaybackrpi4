@@ -150,4 +150,4 @@ The script will clean up all files and services and reboot the Pi back into the 
 
 This project is licensed under the MIT License. See the LICENSE file for details.
 
-© [Year] [Your Name]
+© [2025] [Jonas Pöller]
