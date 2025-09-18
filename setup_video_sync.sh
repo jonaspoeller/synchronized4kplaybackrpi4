@@ -1,95 +1,88 @@
 #!/bin/bash
-# ==================================================================================
-# Automated Setup for Synchronized 4K HEVC Video Playback
-# Version: Final (mit Overscan-Fix)
-#
-# Dieses Skript ist für die unbeaufsichtigte Ausführung konzipiert.
-# ==================================================================================
-
 set -e
 
-# --- 1. Parameter auswerten ---
-while getopts "t:i:m:" opt; do
-  case $opt in
-    t) node_type_str="$OPTARG"
-    ;;
-    i) device_ip="$OPTARG"
-    ;;
-    m) master_ip="$OPTARG"
-    ;;
-    \?) echo "Ungültige Option: -$OPTARG" >&2; exit 1
-    ;;
-  esac
-done
+# --- System Check ---
+if [ "$EUID" -ne 0 ]; then echo "ERROR: Please run as root (sudo)."; exit 1; fi
+if ! uname -a | grep -q 'aarch64'; then echo "ERROR: This script is for 64-bit (aarch64) Raspberry Pi OS only."; exit 1; fi
 
-# --- 2. Validierung der Parameter ---
-if [ "$EUID" -ne 0 ]; then echo "FEHLER: Bitte als root (sudo) ausführen."; exit 1; fi
-if ! uname -a | grep -q 'aarch64'; then echo "FEHLER: Dieses Skript ist nur für ein 64-bit (aarch64) Raspberry Pi OS vorgesehen."; exit 1; fi
-if [ -z "$node_type_str" ] || [ -z "$device_ip" ]; then echo "FEHLER: Parameter fehlen."; exit 1; fi
+# --- User Input ---
+echo "--- Interactive Setup for Video Sync System ---"
+read -p "Enter static IP address for this device: " device_ip
+read -p "Enter sync port for this group (e.g., 5555): " sync_port
+echo ""
+echo "--- Role Configuration ---"
+echo "1) Master Node (controls playback)"
+echo "2) Slave Node (controlled by Master)"
+read -p "Select role type [1-2]: " node_type
 
-if [ "$node_type_str" == "master" ]; then node_type="1"; master_ip=$device_ip;
-elif [ "$node_type_str" == "slave" ]; then node_type="2"; if [ -z "$master_ip" ]; then echo "FEHLER: Slave benötigt eine Master-IP (-m)."; exit 1; fi
-else echo "FEHLER: Ungültiger Rollentyp '$node_type_str'."; exit 1; fi
+if [ "$node_type" == "2" ]; then
+    read -p "Enter the Master device IP address: " master_ip
+else
+    node_type="1"
+    master_ip=$device_ip
+fi
+echo ""
 
-# 3. System Update
-echo "--- Führe vollständiges System-Update durch (dies kann dauern)... ---"
+# --- System & Dependencies ---
+echo "Performing full system upgrade..."
 apt-get update && apt-get full-upgrade -y
-
-# 4. Installiere Abhängigkeiten & setze Berechtigungen
-echo "--- Installiere Abhängigkeiten und setze Berechtigungen... ---"
+echo "Installing dependencies..."
 apt-get install -y vlc python3-pip python3-vlc ffmpeg
 usermod -a -G render,video,audio pi
 loginctl enable-linger pi
 
-# 5. Konfiguriere für stillen Bootvorgang & korrekte Videoausgabe
-echo "--- Konfiguriere System für einen absolut stillen Bootvorgang... ---"
+# --- System Configuration for Silent Boot ---
+echo "Configuring system for silent boot..."
 systemctl set-default multi-user.target
 systemctl disable getty@tty1.service
 
-echo "--- Konfiguriere /boot/firmware/config.txt für robuste Videoausgabe... ---"
-sed -i '/# --- Video Sync Setup ---/,/# --- Ende Video Sync Setup ---/d' /boot/firmware/config.txt
+if cat /proc/cpuinfo | grep -q "Raspberry Pi 5"; then
+    echo "Raspberry Pi 5 detected."
+    V3D_OVERLAY_LINE="dtoverlay=vc4-kms-v3d,cma-512M"
+else
+    echo "Raspberry Pi 4 or older model detected."
+    V3D_OVERLAY_LINE="dtoverlay=vc4-kms-v3d-pi4,cma-512"
+fi
+
+echo "Configuring /boot/firmware/config.txt..."
+sed -i '/# --- Video Sync Setup ---/,/# --- End Video Sync Setup ---/d' /boot/firmware/config.txt
 cat >> /boot/firmware/config.txt << EOF
 
 # --- Video Sync Setup ---
-# Grundkonfiguration für Hardware-Beschleunigung
-disable_splash=1
-dtoverlay=vc4-kms-v3d-pi4,cma-512
+${V3D_OVERLAY_LINE}
 dtoverlay=rpivid-v4l2
-
-# HDMI-Modus explizit erzwingen, um Overscan-Probleme zu vermeiden
-disable_overscan=1    # Deaktiviert die Overscan-Korrektur des Pi
-hdmi_group=1          # CEA-Modus (für Fernseher)
-hdmi_mode=16          # 1080p @ 60Hz. Für 4K@60Hz wäre es hdmi_mode=97
-# --- Ende Video Sync Setup ---
+disable_overscan=1
+hdmi_group=1
+hdmi_mode=16
+# --- End Video Sync Setup ---
 EOF
 
-echo "--- Konfiguriere Kernel-Parameter für den leisestmöglichen Boot... ---"
-sed -i 's/ quiet//g; s/ loglevel=[0-9]*//g; s/ consoleblank=[0-9]*//g; s/ splash//g; s/ vt.global_cursor_default=[0-9]*//g; s/ logo.nologo//g' /boot/firmware/cmdline.txt
+echo "Configuring kernel parameters..."
+sed -i 's/ quiet//g; s/ loglevel=[0-9]*//g; s/ splash//g; s/ vt.global_cursor_default=[0-9]*//g; s/ logo.nologo//g' /boot/firmware/cmdline.txt
 sed -i 's/console=tty1/console=tty3/g' /boot/firmware/cmdline.txt
 sed -i '1 s/$/ quiet loglevel=0 vt.global_cursor_default=0 logo.nologo/' /boot/firmware/cmdline.txt
 
-# 6. Installiere Anwendung
+# --- Application Installation ---
 INSTALL_DIR="/opt/video-sync"
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
 
 if [ "$node_type" == "1" ]; then
     # --- MASTER SETUP ---
-    echo "--- Erstelle Master-Konfiguration... ---"
+    echo "Creating Master configuration..."
     cat > sync_config.ini << EOF
 [network]
 master_ip = $master_ip
 broadcast_ip = $(echo $device_ip | cut -d. -f1-3).255
-sync_port = 5555
+sync_port = $sync_port
 [video]
 file_path = /home/pi/video.mp4
 loop_delay = 0.5
 EOF
-    echo "--- Installiere Master-Skript... ---"
+    echo "Installing Master script..."
     cat > video_sync_master.py << 'MASTER_SCRIPT'
 #!/usr/bin/env python3
 import vlc, socket, time, json, configparser, os
-from datetime import datetime
 class VideoSyncMasterPlayer:
     def __init__(self, config_file='sync_config.ini'):
         self.config = configparser.ConfigParser()
@@ -103,7 +96,6 @@ class VideoSyncMasterPlayer:
         self.instance = vlc.Instance(' '.join(vlc_args))
         self.player = self.instance.media_player_new()
         self.media = None
-        self.black_media = self.instance.media_new('/opt/video-sync/black.png')
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -119,7 +111,6 @@ class VideoSyncMasterPlayer:
         return True
     def prepare_player(self):
         self.player.set_media(self.media)
-        self.player.video_set_scale(0)
         self.player.play()
         time.sleep(0.2)
         self.player.pause()
@@ -128,13 +119,12 @@ class VideoSyncMasterPlayer:
         self.player.play()
         self.is_playing = True
     def start(self):
-        print("="*20, "Video Sync Master", "="*20)
+        print("--- Video Sync Master ---")
         if not self.load_video(): self.stop(); return
-        self.player.set_media(self.black_media); self.player.play()
         self.send_broadcast({'command': 'stop'}); time.sleep(0.2)
         self.send_broadcast({'command': 'load', 'data': {'video_path': self.video_path}}); time.sleep(0.2)
         self.prepare_player()
-        self.send_broadcast({'command': 'prepare'}); time.sleep(0.2)
+        self.send_broadcast({'command': 'prepare', 'data': {'video_path': self.video_path}}); time.sleep(0.2)
         self.play_video()
         self.send_broadcast({'command': 'play'})
         try:
@@ -145,9 +135,9 @@ class VideoSyncMasterPlayer:
                     if self.player.get_state() == vlc.State.Ended:
                         self.is_playing = False
                 if not self.running: break
-                print("\n--- Video ended. Resetting for loop. ---")
+                print("Video ended. Resetting for loop.")
                 self.prepare_player()
-                self.send_broadcast({'command': 'prepare'})
+                self.send_broadcast({'command': 'prepare', 'data': {'video_path': self.video_path}})
                 time.sleep(self.loop_delay)
                 self.play_video()
                 self.send_broadcast({'command': 'play'})
@@ -167,18 +157,18 @@ MASTER_SCRIPT
     PYTHON_EXEC_PATH=$INSTALL_DIR/video_sync_master.py
 else
     # --- SLAVE SETUP ---
-    echo "--- Erstelle Slave-Konfiguration... ---"
+    echo "Creating Slave configuration..."
     cat > sync_config.ini << EOF
 [network]
 master_ip = $master_ip
-sync_port = 5555
+sync_port = $sync_port
 EOF
-    echo "--- Erstelle schwarzes Bild für den Start... ---"
+    echo "Creating black image for standby..."
     ffmpeg -f lavfi -i color=c=black:s=1920x1080:d=1 -vframes 1 /opt/video-sync/black.png -y >/dev/null 2>&1
-    echo "--- Installiere Slave-Skript... ---"
+    echo "Installing Slave script..."
     cat > video_sync_slave.py << 'SLAVE_SCRIPT'
 #!/usr/bin/env python3
-import vlc, socket, time, json, configparser, os
+import vlc, socket, time, json, configparser, os, threading
 class VideoSyncSlave:
     def __init__(self, config_file='sync_config.ini'):
         self.config = configparser.ConfigParser()
@@ -194,24 +184,34 @@ class VideoSyncSlave:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(('', self.sync_port))
         self.running = True
+        self.last_sync_time = time.time()
     def handle_command(self, message):
         if message.get('master_ip') != self.master_ip: return
+        self.last_sync_time = time.time()
         command = message.get('command')
         if command == 'stop':
-            self.player.set_media(self.black_media)
-            self.player.play()
+            self.player.set_media(self.black_media); self.player.play()
         elif command == 'load':
+            video_path = message.get('data', {}).get('video_path')
+            if video_path: self.media = self.instance.media_new(video_path)
+        elif command == 'prepare':
             video_path = message.get('data', {}).get('video_path')
             if video_path and (not self.media or self.media.get_mrl() != video_path):
                 self.media = self.instance.media_new(video_path)
-        elif command == 'prepare':
+                if self.media:
+                    self.media.parse()
+                    if self.media.get_duration() == -1:
+                        print(f"ERROR: Video file '{video_path}' is missing or corrupt.")
+                        self.media = None
             if self.media:
                 self.player.set_media(self.media)
-                self.player.video_set_scale(0)
                 self.player.play()
                 time.sleep(0.2)
                 self.player.pause()
                 self.player.set_position(0)
+            else:
+                self.player.set_media(self.black_media)
+                self.player.play()
         elif command == 'play':
             self.player.play()
     def listen_for_commands(self):
@@ -219,11 +219,22 @@ class VideoSyncSlave:
             try:
                 data, _ = self.sock.recvfrom(1024)
                 self.handle_command(json.loads(data.decode('utf-8')))
-            except Exception:
-                pass
+            except Exception: pass
+    def master_watchdog(self):
+        while self.running:
+            time.sleep(2)
+            if time.time() - self.last_sync_time > 5:
+                print("Master signal lost. Reverting to black screen.")
+                self.player.set_media(self.black_media)
+                self.player.play()
+                self.last_sync_time = time.time()
     def start(self):
+        print("--- Video Sync Slave (Hardened) ---")
         self.player.set_media(self.black_media)
         self.player.play()
+        print("Waiting for master commands...")
+        watchdog_thread = threading.Thread(target=self.master_watchdog, daemon=True)
+        watchdog_thread.start()
         try:
             self.listen_for_commands()
         except KeyboardInterrupt:
@@ -232,6 +243,7 @@ class VideoSyncSlave:
         self.running = False
         self.player.stop()
         self.sock.close()
+        print("Slave stopped.")
 if __name__ == "__main__":
     slave = VideoSyncSlave()
     slave.start()
@@ -240,11 +252,11 @@ SLAVE_SCRIPT
     PYTHON_EXEC_PATH=$INSTALL_DIR/video_sync_slave.py
 fi
 
-# 7. Erstelle Systemd-Dienst
-echo "--- Installiere Systemd-Dienst... ---"
+# --- Systemd Service ---
+echo "Installing Systemd service..."
 cat > /etc/systemd/system/video-sync.service << EOF
 [Unit]
-Description=Video Sync Service ($(if [ "$node_type" == "1" ]; then echo "Master"; else echo "Slave"; fi))
+Description=Video Sync Service ($(if [ "$node_type" == "1" ]; then echo "Master"; else echo "Slave"; fi) on Port $sync_port)
 After=network-online.target
 [Service]
 Type=simple
@@ -259,14 +271,12 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-# 8. Finalisieren
-echo "--- Schließe Installation ab... ---"
+# --- Finalize ---
+echo "Finalizing installation..."
 systemctl daemon-reload
 systemctl enable video-sync.service
 echo ""
-echo "================================================"
-echo "      Installation abgeschlossen!"
-echo "================================================"
-echo "Das System wird in 10 Sekunden automatisch neu gestartet, um alle Änderungen zu aktivieren."
+echo "--- Installation complete! ---"
+echo "The system will reboot in 10 seconds to apply all changes."
 sleep 10
 reboot
