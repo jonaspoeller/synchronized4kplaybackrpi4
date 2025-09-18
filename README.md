@@ -1,25 +1,17 @@
-# Synchronized 4K HEVC Video Playback for Raspberry Pi
+Synchronized 4K HEVC Video Playback for Raspberry Pi
+============================================
 
-A robust, self-healing system for playing perfectly synchronized, seamless video loops across multiple Raspberry Pi 4 devices. Designed for video walls, art installations, and any application requiring flawless multi-screen playback without a central, expensive video controller.
-
-This project is the result of an intensive, iterative development and debugging process, resulting in a highly reliable, "set it and forget it" solution.
-
----
+A system for synchronized, seamless looping video playback across multiple Raspberry Pi 4 devices. It is designed for 24/7 operation in environments like video walls or digital signage.
 
 ## Key Features
 
-- **Perfectly Synchronized Playback:** Starts and loops all screens with millisecond accuracy.
-- **Seamless Looping:** Videos loop without any black screen, flicker, or HDMI resync issues by resetting the media stream without releasing the display controller.
-- **Rock-Solid Reliability:** The system is designed to be "unbreakable".
-  - **Authoritative Master:** The Master node dictates the entire state, ensuring no ambiguity.
-  - **Proactive Slaves:** Slaves boot into a prepared, "warm" standby state, ensuring they are instantly ready for a start command, even when joining a running system.
-- **Completely Headless Operation:**
-  - **Silent Boot:** All Raspberry Pi boot text, logos, and cursors are suppressed for a professional, appliance-like startup.
-  - **Console Disabled:** The login prompt on the attached display is permanently disabled, preventing any on-screen text.
-- **Fully Automated Setup:** A single, intelligent script handles system updates, dependency installation, boot configuration, and service creation from a fresh Raspberry Pi OS install.
-- **Fine-Grained Tuning:** Each device (including the master) has its own local start delay parameter, allowing for precise compensation for different display latencies (e.g., slow TVs vs. fast monitors).
-- **Optimized for Raspberry Pi 4:** Utilizes the 64-bit OS, hardware-accelerated HEVC decoding (`v4l2m2m`), and direct-to-display video rendering (`drm_vout`) for maximum performance.
-- **Proven Performance:** Tested up to **4K@60 fps, 8-bit, 50 Mbit/s** MP4 video files.
+*   **State-Based Synchronization:** Ensures precise playback timing across all devices.
+*   **Master-Failure Recovery:** A watchdog on each slave reverts to a safe black screen if the master signal is lost.
+*   **Automatic Late-Joiner Integration:** Newly started slaves are automatically integrated into the next playback loop.
+*   **Optimized for Raspberry Pi 4:** Delivers hardware-accelerated playback of 4K/60fps 8-bit HEVC video via `v4l2m2m` and `drm_vout`.
+*   **Headless Operation:** Provides a silent boot process and runs as a background `systemd` service.
+*   **Multi-Group Support:** Allows multiple independent playback groups to operate on the same network via selectable ports.
+*   **Automated Setup:** An interactive script handles all system configuration and dependency installation.
 
 ---
 
@@ -27,55 +19,76 @@ This project is the result of an intensive, iterative development and debugging 
 
 The system uses a Master-Slave architecture where one Raspberry Pi acts as the "conductor" (Master) and all others act as the "orchestra" (Slaves).
 
-- **Communication:** The Master sends commands as UDP broadcast packets on the local network. Slaves listen for these commands.
-- **Synchronization Logic:**
-  - **Authoritative Start Sequence:** Upon starting, the Master follows a strict, unskippable sequence to guarantee a perfect cold start:
-    1. It broadcasts a `stop` command to reset any "zombie" slaves from a previous session.
-    2. It broadcasts a `load` command, instructing all slaves to load the video and pause on the first frame.
-    3. It waits for a generous, configurable `initial_prepare_time` (e.g., 10 seconds) to guarantee every single slave is ready.
-    4. Finally, it begins the playback loop by sending a `prepare_play` command with a precise start time in the near future.
-  - **Seamless Looping:** Instead of stopping the player (which causes HDMI flicker), the Master and Slaves simply reset the media stream (`set_media()`) at the end of a loop. This resets the video pipeline internally without releasing the display controller, ensuring a seamless transition.
-  - **Slave Reliability:** A Slave's life cycle is simple and robust:
-    1. On boot, it displays a black image to hide the console.
-    2. It immediately and proactively loads the main video, plays it for a fraction of a second, and pauses on the first frame. It is now in a "warm," ready state.
-    3. It listens for commands. If it loses the Master's signal for more than 5 seconds, a watchdog automatically returns it to the safe black-screen state, ready for a clean start when the Master reappears.
+1.  **Architecture:** The system uses a Master-Slave model. A single Master node controls multiple Slave nodes via UDP broadcast packets. Communication is unidirectional from Master to Slaves.
+
+2.  **Synchronization:** The Master enforces synchronization by broadcasting a strict command sequence (`stop` -> `load` -> `prepare` -> `play`) at the beginning of each loop.
+
+3.  **Reliability:** Slaves are passive receivers that execute commands. The watchdog mechanism ensures a predictable state during a master outage. The looping command sequence allows for automatic recovery and integration of slaves.
 
 ---
 
 ## Prerequisites
 
-- 2 or more Raspberry Pi 4 devices.
-- A fresh installation of **Raspberry Pi OS (64-bit) Bookworm** on each SD card.
-- A stable, wired (Ethernet) network connection is highly recommended.
-- Each Pi must be configured with a **fixed IP address** (either set manually or via DHCP reservation in your router).
-- Your video file, named **`video.mp4`**, must be placed in the `/home/pi/` directory on **every** Pi.
+-   2 or more Raspberry Pi 4 devices.
+
+-   A fresh installation of Raspberry Pi OS (64-bit) Bookworm on each SD card.
+
+-   A stable, wired (Ethernet) network connection.
+
+-   Each Pi must have a unique, fixed IP address.
+
+-   The video file, named `video.mp4`, must be located in `/home/pi/` on every device.
 
 ---
 
 ## Installation
 
-The setup process is fully automated by a single script.
+The installation is a step-by-step process. The following must be performed on **every** Pi (both Master and Slaves). The setup will do a full apt upgrade and reboot afterwards. 
 
-1. **Configure Fixed IPs:** Before running the script, ensure every Pi has its unique, fixed IP address configured and is connected to the network.
-2. **Download the Setup Script:** On each Pi, run:
+#### Step 1: Prepare the System
 
-   ```bash
-   wget https://raw.githubusercontent.com/jonaspoeller/synchronized4kplaybackrpi4/main/setup_video_sync.sh
-   ```
+Before running the installer, each device must be properly configured.
 
-3. **Run the Setup Script:**  
-   ```bash
-   sudo bash setup_video_sync.sh
-   ```
+1.  **Set a Static IP Address:** A static IP is essential for system stability. This can be done via the command line using `nmcli`.
+    *   First, find your connection name (usually `"Wired connection 1"`):
+        ```bash
+        nmcli connection show
+        ```
+    *   Use the following command to set the static IP, gateway, and DNS. **Replace the example values with your network's settings.**
+        ```bash
+        sudo nmcli c mod "Wired connection 1" ipv4.method manual \
+        ipv4.addresses 10.0.0.220/24 \
+        ipv4.gateway 10.0.0.1 \
+        ipv4.dns "8.8.8.8,1.1.1.1"
+        ```
+    *   Apply the changes by restarting the connection:
+        ```bash
+        sudo nmcli c down "Wired connection 1"; sudo nmcli c up "Wired connection 1"
+        ```
+        A reboot will also apply the settings. Verify the new IP with `ip a`.
 
-4. **Follow the Prompts:** The script will ask you for:
-   - The IP address of the current device.
-   - The role of the device (Master or Slave).
-   - The IP address of the Master (if configuring a Slave).
+2.  **Place the Video File:** Copy your video file to the home directory of each Pi. The system expects the file at this exact location:
+    `/home/pi/video.mp4`
 
-5. **Automatic Reboot:** The script will automatically reboot the Pi after the installation is complete.
+#### Step 2: Run the Automated Installer
 
-After the reboot, the system is fully operational and will start automatically.
+Once the static IP is set and the video file is in place, run the automated setup script.
+
+Connect to each Pi via SSH and execute the following command:
+```bash
+wget -O - https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/latest/download/setup.sh | sudo bash
+```
+#### Step 3: Follow the Interactive Prompts
+
+The script will guide you through the final configuration by asking for:
+*   The static IP address of the current device.
+*   The network port for this sync group (e.g., `5555`).
+*   The role of the device (Master or Slave).
+*   The IP address of the Master (if configuring a Slave).
+
+
+The device will reboot automatically upon completion. After the reboot, the system is fully configured and will start playback automatically.
+
 ---
 
 ## Configuration
@@ -93,14 +106,9 @@ sync_port = 5555
 [video]
 file_path = /home/pi/video.mp4
 loop_delay = 0.5
-start_delay = 0.0
-initial_prepare_time = 10
 ```
 
-- **file_path:** Absolute path to your video file. Must be identical on all devices.
 - **loop_delay:** Pause in seconds between the end of one video loop and the start of the next.
-- **start_delay:** Local start time offset in seconds for the Master only.
-- **initial_prepare_time:** Waiting period in seconds after the Master boots before starting playback.
 
 ---
 
@@ -111,17 +119,8 @@ Path: `/opt/video-sync/sync_config.ini` on a Slave
 ```ini
 [network]
 master_ip = 192.168.1.10
-slave_ip = 192.168.1.11
-broadcast_ip = 192.168.1.255
 sync_port = 5555
-
-[video]
-file_path = /home/pi/video.mp4
-start_delay = 0.0
 ```
-
-- **file_path:** Absolute path to your video file. Must be identical on all devices.
-- **start_delay:** Local start time offset for this specific Slave.
 
 ---
 
@@ -139,7 +138,7 @@ video-sync-logs     # View live logs
 ## Uninstallation
 
 ```bash
-sudo bash uninstall_video_sync.sh
+wget -O - https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/latest/download/uninstall.sh | sudo bash
 ```
 
 The script will clean up all files and services and reboot the Pi back into the standard graphical desktop environment.
