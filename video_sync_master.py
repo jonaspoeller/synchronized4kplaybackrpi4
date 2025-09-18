@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-# ==================================================================================
-# Synchronized Video Playback - Master Node (FINALE, SCALE-FIX)
-#
-# LÖSUNG: Verwendet player.video_set_scale(0), um das Bild aggressiv
-#         auf Vollbild zu zwingen.
-# ==================================================================================
 import vlc, socket, time, json, configparser, os
-from datetime import datetime
 
 class VideoSyncMasterPlayer:
     def __init__(self, config_file='sync_config.ini'):
@@ -23,7 +16,6 @@ class VideoSyncMasterPlayer:
         self.instance = vlc.Instance(' '.join(vlc_args))
         self.player = self.instance.media_player_new()
         self.media = None
-        self.black_media = self.instance.media_new('/opt/video-sync/black.png')
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -43,7 +35,6 @@ class VideoSyncMasterPlayer:
 
     def prepare_player(self):
         self.player.set_media(self.media)
-        self.player.video_set_scale(0)
         self.player.play()
         time.sleep(0.2)
         self.player.pause()
@@ -54,17 +45,15 @@ class VideoSyncMasterPlayer:
         self.is_playing = True
 
     def start(self):
-        print("="*20, "Video Sync Master", "="*20)
+        print("--- Video Sync Master ---")
         if not self.load_video(): self.stop(); return
 
-        self.player.set_media(self.black_media); self.player.play()
         self.send_broadcast({'command': 'stop'}); time.sleep(0.2)
-        
         self.send_broadcast({'command': 'load', 'data': {'video_path': self.video_path}}); time.sleep(0.2)
-
+        
         self.prepare_player()
-        self.send_broadcast({'command': 'prepare'}); time.sleep(0.2)
-
+        self.send_broadcast({'command': 'prepare', 'data': {'video_path': self.video_path}}); time.sleep(0.2)
+        
         self.play_video()
         self.send_broadcast({'command': 'play'})
 
@@ -78,12 +67,10 @@ class VideoSyncMasterPlayer:
                 
                 if not self.running: break
 
-                print("\n--- Video ended. Resetting for loop. ---")
+                print("Video ended. Resetting for loop.")
                 self.prepare_player()
-                self.send_broadcast({'command': 'prepare'})
-                
+                self.send_broadcast({'command': 'prepare', 'data': {'video_path': self.video_path}})
                 time.sleep(self.loop_delay)
-
                 self.play_video()
                 self.send_broadcast({'command': 'play'})
         except KeyboardInterrupt:
