@@ -76,7 +76,7 @@ Once the static IP is set and the video file is in place, run the automated setu
 
 Connect to each Pi via SSH and execute the following command:
 ```bash
-wget -O - https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/latest/download/setup.sh | sudo bash
+wget -O - https://raw.githubusercontent.com/jonaspoeller/synchronized4kplaybackrpi4/refs/heads/main/setup_video_sync.sh | sudo bash
 ```
 #### Step 3: Follow the Interactive Prompts
 
