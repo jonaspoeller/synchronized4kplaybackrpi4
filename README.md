@@ -1,17 +1,16 @@
-Synchronized 4K HEVC Video Playback for Raspberry Pi
-============================================
+# Synchronized Video Playback for Raspberry Pi
 
-A system for synchronized, seamless looping video playback across multiple Raspberry Pi 4 devices. It is designed for 24/7 operation in environments like video walls or digital signage.
+A solution for synchronized, looping video playback across multiple Raspberry Pi 4 devices. This system is designed for continuous 24/7 operation in settings like video walls or art installations.
 
 ## Key Features
 
-*   **State-Based Synchronization:** Ensures precise playback timing across all devices.
-*   **Master-Failure Recovery:** A watchdog on each slave reverts to a safe black screen if the master signal is lost.
-*   **Automatic Late-Joiner Integration:** Newly started slaves are automatically integrated into the next playback loop.
-*   **Optimized for Raspberry Pi 4:** Delivers hardware-accelerated playback of 4K/60fps 8-bit HEVC video via `v4l2m2m` and `drm_vout`.
-*   **Headless Operation:** Provides a silent boot process and runs as a background `systemd` service.
-*   **Multi-Group Support:** Allows multiple independent playback groups to operate on the same network via selectable ports.
-*   **Automated Setup:** An interactive script handles all system configuration and dependency installation.
+*   **Playback Synchronization:** Coordinates video playback across multiple devices using a master-slave architecture.
+*   **Master Failure Recovery:** A watchdog on each slave reverts to a black screen if the master's signal is lost.
+*   **Automatic Slave Integration:** Slave nodes that are started late are automatically included in the next playback loop.
+*   **Hardware-Accelerated Playback:** Supports 4K/60fps 8-bit HEVC video decoding.
+*   **Headless Operation:** Designed to run as a background service with a silent boot process.
+*   **Multi-Group Support:** Allows multiple, independent player groups to operate on the same network.
+*   **Automated Setup:** An interactive script handles system configuration and dependency installation.
 
 ---
 
@@ -43,7 +42,7 @@ The system uses a Master-Slave architecture where one Raspberry Pi acts as the "
 
 ## Installation
 
-The installation is a step-by-step process. The following must be performed on **every** Pi (both Master and Slaves). The setup will do a full apt upgrade and reboot afterwards. 
+The installation is a step-by-step process. The following must be performed on **every** Pi (both Master and Slaves). The setup will do a full apt upgrade and reboot afterwards. This is because of some problems caused by outdated drivers.
 
 #### Step 1: Prepare the System
 
