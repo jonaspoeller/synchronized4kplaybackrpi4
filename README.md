@@ -69,15 +69,19 @@ Before running the installer, each device must be properly configured.
 
 2.  **Place the Video File:** Copy your video file to the home directory of each Pi. The system expects the file at this exact location:
     `/home/pi/video.mp4`
-
 #### Step 2: Run the Automated Installer
 
 Once the static IP is set and the video file is in place, run the automated setup script.
 
-Connect to each Pi via SSH and execute the following command:
-```bash
-wget -O - https://raw.githubusercontent.com/jonaspoeller/synchronized4kplaybackrpi4/refs/heads/main/setup_video_sync.sh | sudo bash
-```
+1.  **Download the Installer Script**
+    ```bash
+    wget https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/latest/download/setup_video_sync.sh
+    ```
+
+2.  **Execute the Installer Script**
+    ```bash
+    sudo bash setup_video_sync.sh
+    ```
 #### Step 3: Follow the Interactive Prompts
 
 The script will guide you through the final configuration by asking for:
@@ -138,7 +142,7 @@ video-sync-logs     # View live logs
 ## Uninstallation
 
 ```bash
-wget -O - https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/latest/download/uninstall.sh | sudo bash
+wget -O - https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/latest/download/uninstall_video_sync.sh | sudo bash
 ```
 
 The script will clean up all files and services and reboot the Pi back into the standard graphical desktop environment.
