@@ -42,7 +42,7 @@ The system uses a Master-Slave architecture where one Raspberry Pi acts as the "
 
 ## Installation
 
-The installation is a step-by-step process. The following must be performed on **every** Pi (both Master and Slaves). The setup will do a full apt upgrade and reboot afterwards. This is because of some problems caused by outdated drivers.
+The installation is a step-by-step process. The following must be performed on **every** Pi (both Master and Slaves). The setup will do a full apt upgrade and reboot afterwards. This is to avoid problems caused by outdated drivers.
 
 #### Step 1: Prepare the System
 
