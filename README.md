@@ -17,6 +17,7 @@ A solution for synchronized, looping video playback across multiple Raspberry Pi
 ## How It Works
 
 The system uses a Master-Slave model where a single Master node controls multiple Slave nodes via unidirectional UDP broadcast packets. Synchronization is enforced by the Master broadcasting a strict command sequence (`stop` -> `load` -> `prepare` -> `play`) at the beginning of each loop. This state-based approach, combined with a watchdog on each slave, ensures reliability and allows for the automatic integration of newly started devices.
+
 ---
 
 ## Prerequisites
