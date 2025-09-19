@@ -8,7 +8,7 @@ A solution for synchronized, looping video playback across multiple Raspberry Pi
 *   **Master Failure Recovery:** A watchdog on each slave reverts to a black screen if the master's signal is lost.
 *   **Automatic Slave Integration:** Slave nodes that are started late are automatically included in the next playback loop.
 *   **Hardware-Accelerated Playback:** Supports 4K/60fps 8-bit HEVC video decoding.
-*   **Headless Operation:** Designed to run as a background service with a silent boot process.
+*   **Professional Appliance Mode:** The screen remains completely black from power-on until video playback begins. No boot text, logos, or console prompts are ever displayed.
 *   **Multi-Group Support:** Allows multiple, independent player groups to operate on the same network.
 *   **Automated Setup:** An interactive script handles system configuration and dependency installation.
 
@@ -16,27 +16,16 @@ A solution for synchronized, looping video playback across multiple Raspberry Pi
 
 ## How It Works
 
-The system uses a Master-Slave architecture where one Raspberry Pi acts as the "conductor" (Master) and all others act as the "orchestra" (Slaves).
-
-1.  **Architecture:** The system uses a Master-Slave model. A single Master node controls multiple Slave nodes via UDP broadcast packets. Communication is unidirectional from Master to Slaves.
-
-2.  **Synchronization:** The Master enforces synchronization by broadcasting a strict command sequence (`stop` -> `load` -> `prepare` -> `play`) at the beginning of each loop.
-
-3.  **Reliability:** Slaves are passive receivers that execute commands. The watchdog mechanism ensures a predictable state during a master outage. The looping command sequence allows for automatic recovery and integration of slaves.
-
+The system uses a Master-Slave model where a single Master node controls multiple Slave nodes via unidirectional UDP broadcast packets. Synchronization is enforced by the Master broadcasting a strict command sequence (`stop` -> `load` -> `prepare` -> `play`) at the beginning of each loop. This state-based approach, combined with a watchdog on each slave, ensures reliability and allows for the automatic integration of newly started devices.
 ---
 
 ## Prerequisites
 
--   2 or more Raspberry Pi 4 devices.
-
--   A fresh installation of Raspberry Pi OS (64-bit) Bookworm on each SD card.
-
--   A stable, wired (Ethernet) network connection.
-
--   Each Pi must have a unique, fixed IP address.
-
--   The video file, named `video.mp4`, must be located in `/home/pi/` on every device.
+*   2 or more Raspberry Pi 4 devices.
+*   A fresh installation of **Raspberry Pi OS (64-bit) Bookworm** on each SD card.
+*   A stable, wired (Ethernet) network connection.
+*   Each Pi must have a unique, fixed IP address.
+*   The video file, named `video.mp4`, must be located in `/home/pi/` on every device.
 
 ---
 
