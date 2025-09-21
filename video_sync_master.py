@@ -1,56 +1,40 @@
 #!/usr/bin/env python3
-# ==================================================================================
-# Synchronized Video Playback - Master Node
-# ==================================================================================
-import vlc
-import socket
-import time
-import json
-import configparser
-import os
+import vlc, socket, time, json, configparser, os
 
 class VideoSyncMasterPlayer:
     def __init__(self, config_file='sync_config.ini'):
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
-
-        # Network configuration
         self.broadcast_ip = self.config.get('network', 'broadcast_ip')
         self.sync_port = self.config.getint('network', 'sync_port')
         self.master_ip = self.config.get('network', 'master_ip')
-
-        # Video configuration
         self.video_path = self.config.get('video', 'file_path')
         self.loop_delay = self.config.getfloat('video', 'loop_delay', fallback=0.5)
         
-        # VLC instance with hardware acceleration arguments
-        vlc_args = [
-            '--no-xlib',
-            '--quiet',
-            '--fullscreen',
-            '--no-video-title-show',
-            '--no-osd',
-            '--avcodec-hw=drm',
-            '--codec=hevc_v4l2m2m,hevc',
-            '--vout=drm_vout'
-        ]
-        
+        # VERBESSERUNG: Eindeutige ID für jede Master-Instanz
+        self.sequence_id = int(time.time())
+        print(f"Master started with Sequence ID: {self.sequence_id}")
+
+        vlc_args = ['--no-xlib', '--quiet', '--fullscreen', '--no-video-title-show', '--no-osd', '--avcodec-hw=drm', '--codec=hevc_v4l2m2m,hevc', '--vout=drm_vout']
         self.instance = vlc.Instance(' '.join(vlc_args))
         self.player = self.instance.media_player_new()
+        
+        # KORREKTUR: self.black_media wird jetzt initialisiert
+        self.black_media = self.instance.media_new('/opt/video-sync/black.png')
         self.media = None
         
-        # Network socket for broadcasting commands
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        
         self.is_playing = False
         self.running = True
 
     def send_broadcast(self, message):
         message['master_ip'] = self.master_ip
+        # VERBESSERUNG: Sequenz-ID wird bei jeder Nachricht mitgesendet
+        message['sequence_id'] = self.sequence_id
         self.sock.sendto(json.dumps(message).encode('utf-8'), (self.broadcast_ip, self.sync_port))
-        print(f"Command '{message.get('command')}' sent.")
+        print(f"Command '{message.get('command')}' (Seq: {self.sequence_id}) sent.")
 
     def load_video(self):
         if not os.path.exists(self.video_path):
@@ -59,7 +43,6 @@ class VideoSyncMasterPlayer:
         return True
 
     def prepare_player(self):
-        # Pre-buffers the video to the first frame and pauses.
         self.player.set_media(self.media)
         self.player.video_set_scale(0)
         self.player.play()
@@ -73,33 +56,36 @@ class VideoSyncMasterPlayer:
 
     def start(self):
         print("="*20, "Video Sync Master", "="*20)
+        
+        # VERBESSERUNG: Sauberere Fehlerbehandlung
         if not self.load_video():
-            print(f"ERROR: Video file not found at {self.video_path}")
+            print(f"FATAL ERROR: Video file not found at '{self.video_path}'. Master will not start.")
             self.stop()
             return
+            
+        # KORREKTUR: Zeigt jetzt korrekt den schwarzen Bildschirm beim Start
+        self.player.set_media(self.black_media)
+        self.player.play()
 
-        # Initial command sequence to synchronize all players
         self.send_broadcast({'command': 'stop'}); time.sleep(0.2)
         self.send_broadcast({'command': 'load', 'data': {'video_path': self.video_path}}); time.sleep(0.2)
+        
         self.prepare_player()
         self.send_broadcast({'command': 'prepare', 'data': {'video_path': self.video_path}}); time.sleep(0.2)
+        
         self.play_video()
         self.send_broadcast({'command': 'play'})
 
         try:
             while self.running:
-                # While video is playing, send a periodic sync command.
-                # This serves as a heartbeat for slave watchdogs.
                 while self.is_playing and self.running:
                     self.send_broadcast({'command': 'sync'})
                     time.sleep(1)
                     if self.player.get_state() == vlc.State.Ended:
                         self.is_playing = False
                 
-                if not self.running:
-                    break
-
-                # Reset sequence for the next seamless loop
+                if not self.running: break
+                
                 print("\n--- Video ended. Resetting for loop. ---")
                 self.prepare_player()
                 self.send_broadcast({'command': 'prepare', 'data': {'video_path': self.video_path}})
