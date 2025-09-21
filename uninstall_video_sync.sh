@@ -47,7 +47,7 @@ sed -i 's/console=tty3/console=tty1/g' /boot/firmware/cmdline.txt
 echo "Kernel parameters in 'cmdline.txt' reverted."
 
 # Revert graphics configuration
-sed -i '/# --- Video Sync Setup ---/,/# --- Ende Video Sync Setup ---/d' /boot/firmware/config.txt
+sed -i '/# --- Video Sync Setup ---/,/# --- End Video Sync Setup ---/d' /boot/firmware/config.txt
 echo "Custom settings in 'config.txt' removed."
 echo ""
 
