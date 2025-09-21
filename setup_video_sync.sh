@@ -52,7 +52,6 @@ apt-get update && apt-get full-upgrade -y
 
 echo "--- Installing dependencies and setting permissions... ---"
 apt-get install -y vlc python3-pip python3-vlc ffmpeg
-# KORREKTUR: Tippfehler 'usmod' zu 'usermod' behoben
 usermod -a -G render,video,audio pi
 loginctl enable-linger pi
 
