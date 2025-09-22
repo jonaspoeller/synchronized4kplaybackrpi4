@@ -137,6 +137,13 @@ wget -O - https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases/la
 The script will clean up all files and services and reboot the Pi back into the standard graphical desktop environment.
 
 ---
+## Project Links
+
+*   **[Source Code and All Files](https://github.com/jonaspoeller/synchronized4kplaybackrpi4)**
+*   **[Releases (Downloads)](https://github.com/jonaspoeller/synchronized4kplaybackrpi4/releases)**
+*   **[Report an Issue (Issues)](https://github.com/jonaspoeller/synchronized4kplaybackrpi4/issues)**
+
+---
 
 ## License
 
